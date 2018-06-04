@@ -1,7 +1,6 @@
 package de.flaconi.nifi.processors;
 
 import org.apache.nifi.components.PropertyDescriptor;
-import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
@@ -15,7 +14,8 @@ public abstract class PushMetricProcessor extends AbstractProcessor {
       .name("Pushgateway hostname")
       .description("Hostname or ip address of the Prometheus Pushgateway")
       .required(true)
-      .expressionLanguageSupported(false)
+      .expressionLanguageSupported(true)
+      .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
       .build();
 
@@ -29,12 +29,13 @@ public abstract class PushMetricProcessor extends AbstractProcessor {
       .build();
 
   static final PropertyDescriptor INSTANCE = new PropertyDescriptor.Builder()
-      .name("Hostname")
+      .name("Instance name")
       .description("The hostname of this NiFi instance to be included in the metrics sent to Prometheus")
       .defaultValue("${hostname(true)}")
       .required(true)
       .expressionLanguageSupported(true)
-      .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING, true))
+      .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
+      .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
       .build();
 
   static final PropertyDescriptor JOB_NAME = new PropertyDescriptor.Builder()
