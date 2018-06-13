@@ -25,12 +25,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
 @Tags({"Prometheus", "Pushgateway", "Push", "Gauge"})
 @CapabilityDescription("Pushes a gauge type metric to the Prometheus Pushgateway. If 'Metric Labels' is NOT given "
     + "then 'Metric Value' is taken as metric value otherwise any dynamic attribute defined is used to build the metric value.")
-@DynamicProperty(name = "Gauge metric index",
+@DynamicProperty(name = "Key identifier like sequential numbers",
     value = "Comma separated labels with metric value at the end. e.g. 'get,${application_id},${http_request_total_get}' " +
         "or {$http_method},${http_request_total}'",
     description = "Specifies labels and value to be sent to the Prometheus Pushgateway",
@@ -38,22 +39,25 @@ import java.util.*;
 public class PushGaugeMetric extends PushMetricProcessor {
 
   private static final Logger logger = LoggerFactory.getLogger(PushGaugeMetric.class);
+  private static final Pattern METRIC_LABEL_NAME_RE = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*");
+  private static final Pattern RESERVED_METRIC_LABEL_NAME_RE = Pattern.compile("__.*");
   static final String LABEL_SEPARATOR = ",";
 
   static final PropertyDescriptor GAUGE_NAME = new PropertyDescriptor.Builder()
       .name("Metric Name")
       .description("The gauge metric name")
       .required(true)
-      .expressionLanguageSupported(false)
-      .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+      .expressionLanguageSupported(true)
+      .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+      .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .build();
 
   static final PropertyDescriptor GAUGE_HELP = new PropertyDescriptor.Builder()
       .name("Metric Help")
       .description("The gauge metric help")
-      .required(false)
+      .required(true)
       .expressionLanguageSupported(false)
-      .addValidator(Validator.VALID)
+      .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .build();
 
   static final PropertyDescriptor GAUGE_VALUE = new PropertyDescriptor.Builder()
@@ -61,8 +65,8 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .description("The gauge metric value")
       .required(false)
       .expressionLanguageSupported(true)
+      .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
-      .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
       .build();
 
   static final PropertyDescriptor GAUGE_LABELS = new PropertyDescriptor.Builder()
@@ -70,7 +74,8 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .description("The gauge metric labels, comma-separated labels. If it is set then the dynamic attributes should be added.")
       .required(false)
       .expressionLanguageSupported(false)
-      .addValidator(Validator.VALID)
+      .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+      .addValidator(StandardValidators.createRegexMatchingValidator(Pattern.compile("[a-zA-Z_:][a-zA-Z0-9_:,]*")))
       .build();
 
   @Override
@@ -103,6 +108,8 @@ public class PushGaugeMetric extends PushMetricProcessor {
   protected PropertyDescriptor getSupportedDynamicPropertyDescriptor(String propertyDescriptorName) {
     return new PropertyDescriptor.Builder()
         .name(propertyDescriptorName)
+        .description("Key is an identifier like sequential numbers, value is comma separated labels " +
+            "with metric value at the end. e.g. 'get,${application_id},${http_request_total_get}")
         .required(true)
         .dynamic(true)
         .expressionLanguageSupported(true)
