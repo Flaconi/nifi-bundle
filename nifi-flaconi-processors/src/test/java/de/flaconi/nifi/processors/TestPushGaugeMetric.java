@@ -16,12 +16,11 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.hasEntry;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
 import static org.mockito.Matchers.anyMapOf;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
@@ -37,11 +36,11 @@ public class TestPushGaugeMetric {
   private static final String INSTANCE = "localhost";
   private static final String JOB_NAME = "job_name";
   private static final String GAUGE_NAME = "metric";
-  private static final String GAUGE_NAME_INVALID = "invalid.metric";
+  private static final String GAUGE_NAME_INVALID = StringUtils.repeat(" ", 5);
   private static final String GAUGE_HELP = "help";
   private static final String GAUGE_HELP_INVALID = StringUtils.repeat(" ", 5);
   private static final Double GAUGE_VALUE = 42.0;
-  private static final String GAUGE_VALUE_INVALID = StringUtils.repeat(" ", 5);;
+  private static final String GAUGE_VALUE_INVALID = StringUtils.repeat(" ", 5);
   private static final String[] GAUGE_LABEL_NAMES = new String[]{"method", "appId"};
   private static final String[] GAUGE_LABEL_NAMES_INVALID = new String[]{"method.invalid", "appId.invalid"};
   private static final String[][] GAUGE_LABEL_VALUES = new String[][]{{"get", "1"}, {"post", "1"}};
@@ -139,6 +138,39 @@ public class TestPushGaugeMetric {
     testRunner.run();
   }
 
+  @Test
+  public void testOnTriggerWithFlowFileContent() throws IOException {
+    givenAProcessorWithLabelsSourceFlowContent();
+    givenAFlowFileWithContent();
+
+    testRunner.setValidateExpressionUsage(false);
+    testRunner.run();
+  }
+
+  @Test
+  public void testOnTriggerWithEmptyFlowFileContent() throws IOException {
+    givenAProcessorWithLabelsSourceFlowContent();
+    givenAFlowFile();
+
+    expectedException.expect(AssertionError.class);
+    expectedException.expectMessage(containsString("Flowfile content is empty"));
+
+    testRunner.setValidateExpressionUsage(false);
+    testRunner.run();
+  }
+
+  @Test
+  public void testOnTriggerWithInvalidFlowFileContent() throws IOException {
+    givenAProcessorWithLabelsSourceFlowContent();
+    givenAFlowFileWithInvalidContent();
+
+    expectedException.expect(AssertionError.class);
+    expectedException.expectCause(instanceOf(IllegalArgumentException.class));
+
+    testRunner.setValidateExpressionUsage(false);
+    testRunner.run();
+  }
+
   private void givenAProcessorWithNoValue() {
     testRunner.setProperty(PushGaugeMetric.PUSHGATEWAY_HOSTNAME, "localhost");
     testRunner.setProperty(PushGaugeMetric.PUSHGATEWAY_PORT, "42");
@@ -163,6 +195,7 @@ public class TestPushGaugeMetric {
   private void givenAProcessorWithLabelsAndSuccessConnection() throws IOException {
     givenAProcessorWithNoValue();
     testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS, StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE, PushGaugeMetric.SOURCE_ATTRIBUTE);
     testRunner.setProperty("dynamic1",
         StringUtils.join(
             Stream.concat(Arrays.stream(GAUGE_LABEL_VALUES[0]), Stream.of(GAUGE_VALUE.toString())).toArray(String[]::new),
@@ -174,9 +207,17 @@ public class TestPushGaugeMetric {
     givenAPushGateway();
   }
 
+  private void givenAProcessorWithLabelsSourceFlowContent() throws IOException {
+    givenAProcessorWithNoValue();
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS, StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE, PushGaugeMetric.SOURCE_CONTENT);
+    givenAPushGateway();
+  }
+
   private void givenAProcessorWithIncorrectNumberOfLabels() {
     givenAProcessorWithNoValue();
     testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS, StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE, PushGaugeMetric.SOURCE_ATTRIBUTE);
     testRunner.setProperty("dynamic1",
         StringUtils.join(GAUGE_LABEL_VALUES[0], PushGaugeMetric.LABEL_SEPARATOR));
   }
@@ -186,11 +227,32 @@ public class TestPushGaugeMetric {
     testRunner.setProperty(PushGaugeMetric.GAUGE_HELP, GAUGE_HELP_INVALID);
     testRunner.setProperty(PushGaugeMetric.GAUGE_VALUE, GAUGE_VALUE_INVALID);
     testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS, StringUtils.join(GAUGE_LABEL_NAMES_INVALID, PushGaugeMetric.LABEL_SEPARATOR));
-
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE, PushGaugeMetric.SOURCE_ATTRIBUTE);
   }
 
   private void givenAFlowFile() {
     testRunner.enqueue("");
+  }
+
+
+  private void givenAFlowFileWithContent() {
+    testRunner.enqueue(
+        Arrays.stream(GAUGE_LABEL_VALUES)
+            .map(i ->
+                StringUtils.join(
+                    Stream.concat(
+                        Arrays.stream(i),
+                        Stream.of(GAUGE_VALUE.toString())).toArray(String[]::new), ","))
+            .collect(Collectors.joining("\n"))
+    );
+  }
+
+  private void givenAFlowFileWithInvalidContent() {
+    testRunner.enqueue(
+        Arrays.stream(GAUGE_LABEL_VALUES)
+            .map(i -> StringUtils.join(i, ","))
+            .collect(Collectors.joining("\n"))
+    );
   }
 
   private void givenAPushGateway() throws IOException {

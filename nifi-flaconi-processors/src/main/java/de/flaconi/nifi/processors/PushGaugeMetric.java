@@ -3,6 +3,7 @@ package de.flaconi.nifi.processors;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.exporter.PushGateway;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.annotation.behavior.DynamicProperty;
 import org.apache.nifi.annotation.behavior.InputRequirement;
@@ -24,7 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.StringReader;
+import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
@@ -39,8 +43,8 @@ import java.util.regex.Pattern;
 public class PushGaugeMetric extends PushMetricProcessor {
 
   private static final Logger logger = LoggerFactory.getLogger(PushGaugeMetric.class);
-  private static final Pattern METRIC_LABEL_NAME_RE = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*");
-  private static final Pattern RESERVED_METRIC_LABEL_NAME_RE = Pattern.compile("__.*");
+  static final String SOURCE_ATTRIBUTE = "flowfile-attribute";
+  static final String SOURCE_CONTENT = "flowfile-content";
   static final String LABEL_SEPARATOR = ",";
 
   static final PropertyDescriptor GAUGE_NAME = new PropertyDescriptor.Builder()
@@ -78,6 +82,14 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .addValidator(StandardValidators.createRegexMatchingValidator(Pattern.compile("[a-zA-Z_:][a-zA-Z0-9_:,]*")))
       .build();
 
+  static final PropertyDescriptor GAUGE_LABEL_VALUES_SOURCE = new PropertyDescriptor.Builder()
+      .name("Source of metric label values")
+      .description("Indicates whether the metric label values are taken from the FlowFile content or a FlowFile dynamic attribute; " +
+          "if The gauge metric labels is defined then the source is required.")
+      .required(false)
+      .allowableValues(SOURCE_ATTRIBUTE, SOURCE_CONTENT)
+      .build();
+
   @Override
   protected void init(ProcessorInitializationContext context) {
     super.init(context);
@@ -91,6 +103,7 @@ public class PushGaugeMetric extends PushMetricProcessor {
     descriptors.add(GAUGE_HELP);
     descriptors.add(GAUGE_VALUE);
     descriptors.add(GAUGE_LABELS);
+    descriptors.add(GAUGE_LABEL_VALUES_SOURCE);
     this.descriptors = Collections.unmodifiableList(descriptors);
 
     final Set<Relationship> relationships = new HashSet<>();
@@ -134,18 +147,27 @@ public class PushGaugeMetric extends PushMetricProcessor {
     final String port = processContext.getProperty(PUSHGATEWAY_PORT).getValue();
     final String instance = processContext.getProperty(INSTANCE).evaluateAttributeExpressions(flowFile).getValue();
     final String jobName = processContext.getProperty(JOB_NAME).getValue();
-    final String metricName = processContext.getProperty(GAUGE_NAME).getValue();
+    final String metricName = processContext.getProperty(GAUGE_NAME).evaluateAttributeExpressions(flowFile).getValue();
     final String metricHelp = processContext.getProperty(GAUGE_HELP).getValue();
     final String metricLabels = processContext.getProperty(GAUGE_LABELS).getValue();
+    final String metricLabelValuesSource = processContext.getProperty(GAUGE_LABEL_VALUES_SOURCE).getValue();
     final Map<String, String> groupingKey = Collections.singletonMap("instance", instance);
     final PushGateway pushGateway = newPushGateway(host, port);
     final CollectorRegistry registry = new CollectorRegistry();
 
     try {
+      checkMetricName(metricName);
       if (StringUtils.isEmpty(metricLabels)) {
-        registerMetric(processContext, flowFile, registry, metricName, metricHelp);
+        final Gauge gauge = registerGaugeMetric(registry, metricName, metricHelp);
+        gauge.set(processContext.getProperty(GAUGE_VALUE).evaluateAttributeExpressions(flowFile).asDouble());
       } else {
-        registerMetricWithLabels(processContext, flowFile, registry, metricName, metricHelp, metricLabels);
+        String[] labelNames = metricLabels.split(LABEL_SEPARATOR);
+        final Gauge gauge = registerGaugeMetric(registry, metricName, metricHelp, metricLabels.split(LABEL_SEPARATOR));
+        if (metricLabelValuesSource.equals(SOURCE_ATTRIBUTE)) {
+          setMetricWithLabelsFromAttributes(gauge, processContext, flowFile, labelNames.length);
+        } else {
+          setMetricWithLabelsFromContent(gauge, processSession, flowFile, labelNames.length);
+        }
       }
 
       pushGateway.pushAdd(registry, jobName, groupingKey);
@@ -163,17 +185,24 @@ public class PushGaugeMetric extends PushMetricProcessor {
     final List<ValidationResult> reasons = new ArrayList<>(super.customValidate(validationContext));
 
     if (validationContext.getProperty(GAUGE_LABELS).isSet()) {
-      if (validationContext.getProperties().keySet().stream().noneMatch(PropertyDescriptor::isDynamic)) {
+      if (!validationContext.getProperty(GAUGE_LABEL_VALUES_SOURCE).isSet()) {
         reasons.add(new ValidationResult.Builder()
-            .subject("Dynamic property value")
+            .subject("Source of metric label values")
             .valid(false)
-            .explanation("there is no dynamic property defined for metric label value").build());
+            .explanation("source of metric label values is not defined").build());
       }
 
       String labels = validationContext.getProperty(GAUGE_LABELS).getValue();
-      if (!StringUtils.isEmpty(labels)) {
-        int labelCount = labels.split(LABEL_SEPARATOR).length;
+      String labelValuesSource = validationContext.getProperty(GAUGE_LABEL_VALUES_SOURCE).getValue();
+      if (labelValuesSource != null && labelValuesSource.equals(SOURCE_ATTRIBUTE) && !StringUtils.isEmpty(labels)) {
+        if (validationContext.getProperties().keySet().stream().noneMatch(PropertyDescriptor::isDynamic)) {
+          reasons.add(new ValidationResult.Builder()
+              .subject("Dynamic property value")
+              .valid(false)
+              .explanation("there is no dynamic property defined for metric label value").build());
+        }
 
+        int labelCount = labels.split(LABEL_SEPARATOR).length;
         boolean isDynamicPropertyValid = validationContext.getProperties().keySet().stream()
             .filter(PropertyDescriptor::isDynamic)
             .noneMatch(propertyDescriptor ->
@@ -187,7 +216,6 @@ public class PushGaugeMetric extends PushMetricProcessor {
               .valid(false)
               .explanation("the dynamic property values should contain " + (labelCount + 1)
                   + " items (including metric label value at the end) since there is/are " + labelCount + " label(s) defined.").build());
-
         }
       }
     }
@@ -195,35 +223,31 @@ public class PushGaugeMetric extends PushMetricProcessor {
     return reasons;
   }
 
-  private void registerMetric(ProcessContext processContext, FlowFile flowFile, CollectorRegistry registry,
-                              String metricName, String metricHelp) throws NumberFormatException {
-    Gauge.build()
-        .name(metricName)
-        .help(metricHelp)
-        .register(registry)
-        .set(processContext.getProperty(GAUGE_VALUE).evaluateAttributeExpressions(flowFile).asDouble());
-  }
-
-  private void registerMetricWithLabels(ProcessContext processContext, FlowFile flowFile, CollectorRegistry registry,
-                                        String metricName, String metricHelp, String metricLabels) throws NumberFormatException {
-    final Gauge metric = Gauge.build()
-        .name(metricName)
-        .help(metricHelp)
-        .labelNames(metricLabels.split(LABEL_SEPARATOR))
-        .register(registry);
-
+  private void setMetricWithLabelsFromAttributes(Gauge gauge, ProcessContext processContext, FlowFile flowFile, int labelNamesCount) throws NumberFormatException {
     processContext.getProperties().keySet().stream().filter(PropertyDescriptor::isDynamic)
         .forEach(propertyDescriptor -> {
           String value = processContext.getProperty(propertyDescriptor).evaluateAttributeExpressions(flowFile).getValue();
-          String[] labels = StringUtils.split(value, LABEL_SEPARATOR);
-          metric
-              .labels(Arrays.copyOfRange(labels, 0, labels.length - 1))
-              .set(Double.parseDouble(labels[labels.length - 1]));
-        });// last item is the value
+          setLabelValuesToGaugeMetric(gauge, value, labelNamesCount + 1);
+        });
+  }
+
+  private void setMetricWithLabelsFromContent(Gauge gauge, ProcessSession processSession, FlowFile flowFile, int labelNamesCount) throws NumberFormatException, IOException {
+    String content = getFlowContent(processSession, flowFile);
+    if (StringUtils.isEmpty(content)) {
+      throw new IllegalArgumentException("Flowfile content is empty.");
+    }
+    IOUtils
+        .readLines(new StringReader(content))
+        .forEach(item -> setLabelValuesToGaugeMetric(gauge, item, labelNamesCount + 1));
+  }
+
+  private String getFlowContent(ProcessSession processSession, FlowFile flowFile) {
+    final AtomicReference<String> content = new AtomicReference<>();
+    processSession.read(flowFile, in -> content.set(IOUtils.toString(in, Charset.forName("UTF-8"))));
+    return content.get();
   }
 
   public PushGateway newPushGateway(String host, String port) {
     return new PushGateway(host + ":" + port);
   }
-
 }

@@ -1,14 +1,25 @@
 package de.flaconi.nifi.processors;
 
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.client.Gauge;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
+
+import static de.flaconi.nifi.processors.PushGaugeMetric.LABEL_SEPARATOR;
 
 public abstract class PushMetricProcessor extends AbstractProcessor {
+
+  private static final Pattern METRIC_NAME_RE = Pattern.compile("[a-zA-Z_:][a-zA-Z0-9_:]*");
+  private static final Pattern METRIC_LABEL_NAME_RE = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*");
+  private static final Pattern RESERVED_METRIC_LABEL_NAME_RE = Pattern.compile("__.*");
 
   static final PropertyDescriptor PUSHGATEWAY_HOSTNAME = new PropertyDescriptor.Builder()
       .name("Pushgateway hostname")
@@ -70,4 +81,44 @@ public abstract class PushMetricProcessor extends AbstractProcessor {
     return this.relationships;
   }
 
+  Gauge registerGaugeMetric(CollectorRegistry registry, String metricName, String metricHelp) throws NumberFormatException {
+    return Gauge.build()
+        .name(metricName)
+        .help(metricHelp)
+        .register(registry);
+  }
+
+  Gauge registerGaugeMetric(CollectorRegistry registry, String metricName, String metricHelp,
+                            String[] labelNames) throws NumberFormatException {
+    return Gauge.build()
+        .name(metricName)
+        .help(metricHelp)
+        .labelNames(labelNames)
+        .register(registry);
+  }
+
+  void setLabelValuesToGaugeMetric(Gauge metric, String labelsLine, int maxItem) throws IllegalArgumentException {
+    String[] items = StringUtils.split(labelsLine, LABEL_SEPARATOR);
+    if (items.length != maxItem) {
+      throw new IllegalArgumentException("Metric label value line (" + labelsLine + ") should have " + maxItem + " item(s) comma separated.");
+    }
+    metric
+        .labels(Arrays.copyOfRange(items, 0, items.length - 1))
+        .set(Double.parseDouble(items[items.length - 1]));
+  }
+
+  static void checkMetricName(String name) throws IllegalArgumentException {
+    if (!METRIC_NAME_RE.matcher(name).matches()) {
+      throw new IllegalArgumentException("Invalid metric name: " + name);
+    }
+  }
+
+  protected static void checkMetricLabelName(String name) {
+    if (!METRIC_LABEL_NAME_RE.matcher(name).matches()) {
+      throw new IllegalArgumentException("Invalid metric label name: " + name);
+    }
+    if (RESERVED_METRIC_LABEL_NAME_RE.matcher(name).matches()) {
+      throw new IllegalArgumentException("Invalid metric label name, reserved for internal use: " + name);
+    }
+  }
 }
