@@ -1,1 +1,2 @@
 de.flaconi.nifi.processors.PushGaugeMetric
+de.flaconi.nifi.processors.ConvertJSONToSQL
