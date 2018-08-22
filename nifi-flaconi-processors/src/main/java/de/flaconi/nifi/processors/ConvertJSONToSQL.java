@@ -27,6 +27,8 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -562,6 +564,13 @@ public class ConvertJSONToSQL extends AbstractProcessor {
       case Types.DATE:
       case Types.TIME:
       case Types.TIMESTAMP:
+        try {
+          final DateTimeFormatter fromFormatter = DateTimeFormatter.ofPattern("EEE MMM dd HH:mm:ss zzz yyyy");
+          final DateTimeFormatter toFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+          fieldValue = LocalDateTime.parse(fieldValue, fromFormatter).format(toFormatter);
+        } catch (Exception e) {
+          // Ignored
+        }
         break;
 
       // Truncate string data types only.
@@ -788,10 +797,7 @@ public class ConvertJSONToSQL extends AbstractProcessor {
         final Integer colSize = desc.getColumnSize();
         final JsonNode fieldNode = rootNode.get(fieldName);
         if (!fieldNode.isNull()) {
-          String fieldValue = fieldNode.asText();
-          if (colSize != null && fieldValue.length() > colSize) {
-            fieldValue = fieldValue.substring(0, colSize);
-          }
+          String fieldValue = createSqlStringValue(fieldNode, colSize, sqlType);
           attributes.put(attributePrefix + ".args." + fieldCount + ".value", fieldValue);
         }
       }
