@@ -4,6 +4,7 @@ import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.Gauge;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.components.PropertyDescriptor;
+import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
@@ -25,7 +26,7 @@ public abstract class PushMetricProcessor extends AbstractProcessor {
       .name("Pushgateway hostname")
       .description("Hostname or ip address of the Prometheus Pushgateway")
       .required(true)
-      .expressionLanguageSupported(true)
+      .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
       .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
       .build();
@@ -35,7 +36,7 @@ public abstract class PushMetricProcessor extends AbstractProcessor {
       .description("Port number of the Prometheus Pushgateway")
       .defaultValue("9091")
       .required(true)
-      .expressionLanguageSupported(false)
+      .expressionLanguageSupported(ExpressionLanguageScope.NONE)
       .addValidator(StandardValidators.PORT_VALIDATOR)
       .build();
 
@@ -44,7 +45,7 @@ public abstract class PushMetricProcessor extends AbstractProcessor {
       .description("The hostname of this NiFi instance to be included in the metrics sent to Prometheus")
       .defaultValue("${hostname(true)}")
       .required(true)
-      .expressionLanguageSupported(true)
+      .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
       .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
       .build();
@@ -54,7 +55,7 @@ public abstract class PushMetricProcessor extends AbstractProcessor {
       .description("The job name to be included in the metrics sent to Prometheus")
       .defaultValue("global")
       .required(true)
-      .expressionLanguageSupported(false)
+      .expressionLanguageSupported(ExpressionLanguageScope.NONE)
       .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
       .build();
 

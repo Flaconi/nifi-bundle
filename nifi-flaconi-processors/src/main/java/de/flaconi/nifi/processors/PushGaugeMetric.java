@@ -14,6 +14,7 @@ import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.Validator;
 import org.apache.nifi.expression.AttributeExpression;
+import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
@@ -51,7 +52,7 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .name("Metric Name")
       .description("The gauge metric name")
       .required(true)
-      .expressionLanguageSupported(true)
+      .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .build();
@@ -60,7 +61,7 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .name("Metric Help")
       .description("The gauge metric help")
       .required(true)
-      .expressionLanguageSupported(false)
+      .expressionLanguageSupported(ExpressionLanguageScope.NONE)
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .build();
 
@@ -68,7 +69,7 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .name("Metric Value")
       .description("The gauge metric value")
       .required(false)
-      .expressionLanguageSupported(true)
+      .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .build();
@@ -77,7 +78,7 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .name("Metric Labels")
       .description("The gauge metric labels, comma-separated labels. If it is set then the dynamic attributes should be added.")
       .required(false)
-      .expressionLanguageSupported(false)
+      .expressionLanguageSupported(ExpressionLanguageScope.NONE)
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .addValidator(StandardValidators.createRegexMatchingValidator(Pattern.compile("[a-zA-Z_:][a-zA-Z0-9_:,]*")))
       .build();
@@ -125,7 +126,7 @@ public class PushGaugeMetric extends PushMetricProcessor {
             "with metric value at the end. e.g. 'get,${application_id},${http_request_total_get}")
         .required(true)
         .dynamic(true)
-        .expressionLanguageSupported(true)
+        .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
         .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING, true))
         .addValidator(Validator.VALID)
         .build();
