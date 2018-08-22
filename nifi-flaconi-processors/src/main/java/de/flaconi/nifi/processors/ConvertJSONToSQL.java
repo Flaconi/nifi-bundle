@@ -80,7 +80,7 @@ import static org.apache.nifi.flowfile.attributes.FragmentAttributes.copyAttribu
 @SupportsBatching
 @SeeAlso(PutSQL.class)
 @InputRequirement(Requirement.INPUT_REQUIRED)
-@Tags({"json", "sql", "database", "rdbms", "insert", "update", "delete", "relational", "flat"})
+@Tags({"json", "sql", "database", "rdbms", "insert", "update", "delete", "relational", "flat", "datetime fix", "delete fix"})
 @CapabilityDescription("Converts a JSON-formatted FlowFile into an UPDATE, INSERT, or DELETE SQL statement. The incoming FlowFile is expected to be "
     + "\"flat\" JSON message, meaning that it consists of a single JSON element and each field maps to a simple type. If a field maps to "
     + "a JSON object, that JSON object will be interpreted as Text. If the input is an array of JSON elements, each element in the array is "
