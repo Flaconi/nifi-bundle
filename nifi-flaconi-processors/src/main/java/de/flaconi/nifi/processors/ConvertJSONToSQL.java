@@ -48,7 +48,6 @@ import org.apache.nifi.annotation.behavior.SupportsBatching;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
 import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
-import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.components.AllowableValue;
@@ -65,7 +64,6 @@ import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.io.InputStreamCallback;
 import org.apache.nifi.processor.io.OutputStreamCallback;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.processors.standard.PutSQL;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.node.ArrayNode;
@@ -78,7 +76,6 @@ import static org.apache.nifi.flowfile.attributes.FragmentAttributes.copyAttribu
 
 @SideEffectFree
 @SupportsBatching
-@SeeAlso(PutSQL.class)
 @InputRequirement(Requirement.INPUT_REQUIRED)
 @Tags({"json", "sql", "database", "rdbms", "insert", "update", "delete", "relational", "flat", "datetime fix", "delete fix"})
 @CapabilityDescription("Converts a JSON-formatted FlowFile into an UPDATE, INSERT, or DELETE SQL statement. The incoming FlowFile is expected to be "
@@ -154,12 +151,26 @@ public class ConvertJSONToSQL extends AbstractProcessor {
       .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
       .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
       .build();
+  static final PropertyDescriptor INCLUDE_CATALOG_NAME = new PropertyDescriptor.Builder()
+      .name("Include Catalog Name")
+      .description("Prepend the name of the catalog to the table name (eg. catalog_name.table_name)")
+      .required(false)
+      .defaultValue("false")
+      .allowableValues("true", "false")
+      .build();
   static final PropertyDescriptor SCHEMA_NAME = new PropertyDescriptor.Builder()
       .name("Schema Name")
       .description("The name of the schema that the table belongs to. This may not apply for the database that you are updating. In this case, leave the field empty")
       .required(false)
       .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
       .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+      .build();
+  static final PropertyDescriptor INCLUDE_SCHEMA_NAME = new PropertyDescriptor.Builder()
+      .name("Include Schema Name")
+      .description("Prepend the name of the schema to the table name (eg. schema_name.table_name)")
+      .required(false)
+      .defaultValue("false")
+      .allowableValues("true", "false")
       .build();
   static final PropertyDescriptor TRANSLATE_FIELD_NAMES = new PropertyDescriptor.Builder()
       .name("Translate Field Names")
@@ -250,6 +261,8 @@ public class ConvertJSONToSQL extends AbstractProcessor {
     properties.add(TABLE_NAME);
     properties.add(CATALOG_NAME);
     properties.add(SCHEMA_NAME);
+    properties.add(INCLUDE_CATALOG_NAME);
+    properties.add(INCLUDE_SCHEMA_NAME);
     properties.add(TRANSLATE_FIELD_NAMES);
     properties.add(UNMATCHED_FIELD_BEHAVIOR);
     properties.add(UNMATCHED_COLUMN_BEHAVIOR);
@@ -293,6 +306,8 @@ public class ConvertJSONToSQL extends AbstractProcessor {
     final String catalog = context.getProperty(CATALOG_NAME).evaluateAttributeExpressions(flowFile).getValue();
     final String schemaName = context.getProperty(SCHEMA_NAME).evaluateAttributeExpressions(flowFile).getValue();
     final String tableName = context.getProperty(TABLE_NAME).evaluateAttributeExpressions(flowFile).getValue();
+    final boolean includeCatalog = context.getProperty(INCLUDE_CATALOG_NAME).asBoolean();
+    final boolean includeSchema = context.getProperty(INCLUDE_SCHEMA_NAME).asBoolean();
     final SchemaKey schemaKey = new SchemaKey(catalog, tableName);
     final boolean includePrimaryKeys = UPDATE_TYPE.equals(statementType) && updateKeys == null;
 
@@ -375,10 +390,10 @@ public class ConvertJSONToSQL extends AbstractProcessor {
       try {
         // build the fully qualified table name
         final StringBuilder tableNameBuilder = new StringBuilder();
-        if (catalog != null) {
+        if (catalog != null && includeCatalog) {
           tableNameBuilder.append(catalog).append(".");
         }
-        if (schemaName != null) {
+        if (schemaName != null && includeSchema) {
           tableNameBuilder.append(schemaName).append(".");
         }
         tableNameBuilder.append(tableName);
