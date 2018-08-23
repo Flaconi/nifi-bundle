@@ -133,9 +133,10 @@ public class ConvertJSONToSQL extends AbstractProcessor {
       .build();
   static final PropertyDescriptor STATEMENT_TYPE = new PropertyDescriptor.Builder()
       .name("Statement Type")
-      .description("Specifies the type of SQL Statement to generate")
+      .description("Specifies the type of SQL Statement to generate (INSERT, DELETE, UPDATE)")
       .required(true)
-      .allowableValues(UPDATE_TYPE, INSERT_TYPE, DELETE_TYPE)
+      .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
+      .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
       .build();
   static final PropertyDescriptor TABLE_NAME = new PropertyDescriptor.Builder()
       .name("Table Name")
@@ -300,7 +301,7 @@ public class ConvertJSONToSQL extends AbstractProcessor {
 
     final boolean translateFieldNames = context.getProperty(TRANSLATE_FIELD_NAMES).asBoolean();
     final boolean ignoreUnmappedFields = IGNORE_UNMATCHED_FIELD.getValue().equalsIgnoreCase(context.getProperty(UNMATCHED_FIELD_BEHAVIOR).getValue());
-    final String statementType = context.getProperty(STATEMENT_TYPE).getValue();
+    final String statementType = context.getProperty(STATEMENT_TYPE).evaluateAttributeExpressions(flowFile).getValue();
     final String updateKeys = context.getProperty(UPDATE_KEY).evaluateAttributeExpressions(flowFile).getValue();
 
     final String catalog = context.getProperty(CATALOG_NAME).evaluateAttributeExpressions(flowFile).getValue();
@@ -405,9 +406,11 @@ public class ConvertJSONToSQL extends AbstractProcessor {
         } else if (UPDATE_TYPE.equals(statementType)) {
           sql = generateUpdate(jsonNode, attributes, fqTableName, updateKeys, schema, translateFieldNames, ignoreUnmappedFields,
               failUnmappedColumns, warningUnmappedColumns, escapeColumnNames, quoteTableName, attributePrefix);
-        } else {
+        } else if (DELETE_TYPE.equals(statementType)) {
           sql = generateDelete(jsonNode, attributes, fqTableName, schema, translateFieldNames, ignoreUnmappedFields,
               failUnmappedColumns, warningUnmappedColumns, escapeColumnNames, quoteTableName, attributePrefix);
+        } else {
+          throw new ProcessException(INSERT_TYPE + ", " + UPDATE_TYPE + ", " + DELETE_TYPE + " types are allowed");
         }
       } catch (final ProcessException pe) {
         getLogger().error("Failed to convert {} to a SQL {} statement due to {}; routing to failure",
