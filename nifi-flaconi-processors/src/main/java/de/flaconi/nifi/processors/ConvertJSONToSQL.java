@@ -43,6 +43,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
+import org.apache.nifi.annotation.behavior.ReadsAttribute;
+import org.apache.nifi.annotation.behavior.ReadsAttributes;
 import org.apache.nifi.annotation.behavior.SideEffectFree;
 import org.apache.nifi.annotation.behavior.SupportsBatching;
 import org.apache.nifi.annotation.behavior.WritesAttribute;
@@ -83,6 +85,10 @@ import static org.apache.nifi.flowfile.attributes.FragmentAttributes.copyAttribu
     + "a JSON object, that JSON object will be interpreted as Text. If the input is an array of JSON elements, each element in the array is "
     + "output as a separate FlowFile to the 'sql' relationship. Upon successful conversion, the original FlowFile is routed to the 'original' "
     + "relationship and the SQL is routed to the 'sql' relationship.")
+@ReadsAttributes({
+    @ReadsAttribute(attribute = "convertJSONToSQL.clearCache", description = "If the attribute exists then the cache for table schema info is flushed"
+        + "not two FlowFiles belong to the same transaction."),
+})
 @WritesAttributes({
     @WritesAttribute(attribute="mime.type", description="Sets mime.type of FlowFile that is routed to 'sql' to 'text/plain'."),
     @WritesAttribute(attribute = "<sql>.table", description = "Sets the <sql>.table attribute of FlowFile that is routed to 'sql' to the name of the table that is updated by the SQL statement. "
@@ -287,6 +293,10 @@ public class ConvertJSONToSQL extends AbstractProcessor {
 
   @OnScheduled
   public void onScheduled(final ProcessContext context) {
+    clearSchemaCache();
+  }
+
+  protected void clearSchemaCache() {
     synchronized (this) {
       schemaCache.clear();
     }
@@ -297,6 +307,11 @@ public class ConvertJSONToSQL extends AbstractProcessor {
     FlowFile flowFile = session.get();
     if (flowFile == null) {
       return;
+    }
+
+    // flush the table schema cache if the flag exists in flowfile
+    if (flowFile.getAttribute("convertJsonTOSql.clearCache") != null) {
+      clearSchemaCache();
     }
 
     final boolean translateFieldNames = context.getProperty(TRANSLATE_FIELD_NAMES).asBoolean();
