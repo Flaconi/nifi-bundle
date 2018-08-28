@@ -811,6 +811,9 @@ public class ConvertJSONToSQL extends AbstractProcessor {
       }
 
       if (desc != null) {
+        final JsonNode fieldNode = rootNode.get(fieldName);
+        boolean nullOperator = fieldNode.isNull();
+
         if (fieldCount++ > 0) {
           sqlBuilder.append(" AND ");
         }
@@ -822,13 +825,12 @@ public class ConvertJSONToSQL extends AbstractProcessor {
         } else {
           sqlBuilder.append(desc.getColumnName());
         }
-        sqlBuilder.append(" = ?");
+        sqlBuilder.append((nullOperator ? " IS" : " =")).append(" ?");
 
         final int sqlType = desc.getDataType();
         attributes.put(attributePrefix + ".args." + fieldCount + ".type", String.valueOf(sqlType));
 
         final Integer colSize = desc.getColumnSize();
-        final JsonNode fieldNode = rootNode.get(fieldName);
         if (!fieldNode.isNull()) {
           String fieldValue = createSqlStringValue(fieldNode, colSize, sqlType);
           attributes.put(attributePrefix + ".args." + fieldCount + ".value", fieldValue);
