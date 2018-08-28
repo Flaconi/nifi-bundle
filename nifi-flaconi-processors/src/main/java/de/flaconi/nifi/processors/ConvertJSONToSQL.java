@@ -325,7 +325,6 @@ public class ConvertJSONToSQL extends AbstractProcessor {
     final boolean includeCatalog = context.getProperty(INCLUDE_CATALOG_NAME).asBoolean();
     final boolean includeSchema = context.getProperty(INCLUDE_SCHEMA_NAME).asBoolean();
     final SchemaKey schemaKey = new SchemaKey(catalog, tableName);
-    final boolean includePrimaryKeys = UPDATE_TYPE.equals(statementType) && updateKeys == null;
 
     // Is the unmatched column behaviour fail or warning?
     final boolean failUnmappedColumns = FAIL_UNMATCHED_COLUMN.getValue().equalsIgnoreCase(context.getProperty(UNMATCHED_COLUMN_BEHAVIOR).getValue());
@@ -351,7 +350,7 @@ public class ConvertJSONToSQL extends AbstractProcessor {
         // No schema exists for this table yet. Query the database to determine the schema and put it into the cache.
         final DBCPService dbcpService = context.getProperty(CONNECTION_POOL).asControllerService(DBCPService.class);
         try (final Connection conn = dbcpService.getConnection(flowFile == null ? Collections.emptyMap() : flowFile.getAttributes())) {
-          schema = TableSchema.from(conn, catalog, schemaName, tableName, translateFieldNames, includePrimaryKeys);
+          schema = TableSchema.from(conn, catalog, schemaName, tableName, translateFieldNames);
           schemaCache.put(schemaKey, schema);
         } catch (final SQLException e) {
           getLogger().error("Failed to convert {} into a SQL statement due to {}; routing to failure", new Object[] {flowFile, e.toString()}, e);
@@ -887,7 +886,7 @@ public class ConvertJSONToSQL extends AbstractProcessor {
     }
 
     public static TableSchema from(final Connection conn, final String catalog, final String schema, final String tableName,
-                                   final boolean translateColumnNames, final boolean includePrimaryKeys) throws SQLException {
+                                   final boolean translateColumnNames) throws SQLException {
       final DatabaseMetaData dmd = conn.getMetaData();
 
       try (final ResultSet colrs = dmd.getColumns(catalog, schema, tableName, "%")) {
@@ -898,13 +897,11 @@ public class ConvertJSONToSQL extends AbstractProcessor {
         }
 
         final Set<String> primaryKeyColumns = new HashSet<>();
-        if (includePrimaryKeys) {
-          try (final ResultSet pkrs = conn.getMetaData().getPrimaryKeys(catalog, null, tableName)) {
+        try (final ResultSet pkrs = conn.getMetaData().getPrimaryKeys(catalog, null, tableName)) {
 
-            while (pkrs.next()) {
-              final String colName = pkrs.getString("COLUMN_NAME");
-              primaryKeyColumns.add(normalizeColumnName(colName, translateColumnNames));
-            }
+          while (pkrs.next()) {
+            final String colName = pkrs.getString("COLUMN_NAME");
+            primaryKeyColumns.add(normalizeColumnName(colName, translateColumnNames));
           }
         }
 
