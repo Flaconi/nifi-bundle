@@ -5,18 +5,18 @@
     <parent>
         <groupId>org.apache.nifi</groupId>
         <artifactId>nifi-nar-bundles</artifactId>
-        <version>1.7.1</version>
+        <version>1.15.2</version>
     </parent>
 
     <groupId>de.flaconi.nifi</groupId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.15.2</version>
     <artifactId>nifi-flaconi-bundle</artifactId>
     <packaging>pom</packaging>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <nifi.version>1.7.1</nifi.version>
+        <nifi.version>1.15.2</nifi.version>
     </properties>
 
     <modules>
@@ -29,12 +29,12 @@
             <dependency>
                 <groupId>de.flaconi.nifi</groupId>
                 <artifactId>nifi-flaconi-processors</artifactId>
-                <version>1.0-SNAPSHOT</version>
+                <version>1.15.2</version>
             </dependency>
             <dependency>
                 <groupId>io.prometheus</groupId>
                 <artifactId>simpleclient_pushgateway</artifactId>
-                <version>0.5.0</version>
+                <version>0.9.0</version>
             </dependency>
             <dependency>
                 <groupId>org.codehaus.jackson</groupId>
