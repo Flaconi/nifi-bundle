@@ -46,3 +46,14 @@ Build libraries
 ```commandline
 $ mvn package
 ```
+
+## Build non-interacive
+Build libraries using local maven cache
+```commandline
+$ docker run --rm --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-amazoncorretto-8-debian -c "apt update && apt install git -y && git config --global --add safe.directory /work && mvn package"
+```
+
+Run tests using local maven cache
+```commandline
+$ docker run --rm --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-amazoncorretto-8-debian -c "apt update && apt install git -y && git config --global --add safe.directory /work && mvn test"
+```

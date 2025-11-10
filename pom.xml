@@ -22,6 +22,7 @@
     <modules>
         <module>nifi-flaconi-nar</module>
         <module>nifi-flaconi-processors</module>
+        <module>nifi-flaconi-reporting-tasks</module>
     </modules>
 
     <dependencyManagement>
@@ -29,7 +30,12 @@
             <dependency>
                 <groupId>de.flaconi.nifi</groupId>
                 <artifactId>nifi-flaconi-processors</artifactId>
-                <version>1.15.2</version>
+                <version>${nifi.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>de.flaconi.nifi</groupId>
+                <artifactId>nifi-flaconi-reporting-tasks</artifactId>
+                <version>${nifi.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.prometheus</groupId>
