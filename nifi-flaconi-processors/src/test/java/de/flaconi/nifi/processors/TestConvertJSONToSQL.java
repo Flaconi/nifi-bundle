@@ -17,7 +17,8 @@ public class TestConvertJSONToSQL {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode node = mapper.readTree(payload);
 
-    String value = ConvertJSONToSQL.createSqlStringValue(node.get("created_at"), 26, Types.TIMESTAMP);
+    String value = ConvertJSONToSQL.createSqlStringValue(node.get("created_at"), 26,
+        Types.TIMESTAMP);
 
     assertThat(value, is("2018-08-17 10:10:10.000"));
   }

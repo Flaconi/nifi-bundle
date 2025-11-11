@@ -6,7 +6,12 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.anyMap;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.isA;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.PushGateway;
@@ -32,16 +37,16 @@ import org.mockito.ArgumentCaptor;
 
 public class TestPrometheusReportingTask {
 
+  private final static String JVM_METRIC_NAME = "jvm_heap_used";
+  private final static Double JVM_METRIC_VALUE = 42.0;
+  private final static String STATUS_METRIC_NAME = "ActiveThreads";
+  private final static Double STATUS_METRIC_VALUE = 10.0;
   private TestablePrometheusRepoprtingTask reportingTask;
   private ValidationContext validationContext;
   private ReportingContext reportingContext;
   private ReportingInitializationContext initializationContext;
   private MetricsService metricService;
   private PushGateway pushGateway;
-  private final static String JVM_METRIC_NAME = "jvm_heap_used";
-  private final static Double JVM_METRIC_VALUE = 42.0;
-  private final static String STATUS_METRIC_NAME = "ActiveThreads";
-  private final static Double STATUS_METRIC_VALUE = 10.0;
 
   @Test
   public void testCustomValidate() {
@@ -59,10 +64,12 @@ public class TestPrometheusReportingTask {
     reportingTask.initialize(initializationContext);
     reportingTask.onTrigger(reportingContext);
 
-    ArgumentCaptor<CollectorRegistry> collectorRegistry = ArgumentCaptor.forClass(CollectorRegistry.class);
+    ArgumentCaptor<CollectorRegistry> collectorRegistry = ArgumentCaptor.forClass(
+        CollectorRegistry.class);
     verify(pushGateway).pushAdd(collectorRegistry.capture(), anyString(), anyMap());
     assertThat(collectorRegistry.getValue().getSampleValue(JVM_METRIC_NAME), is(JVM_METRIC_VALUE));
-    assertThat(collectorRegistry.getValue().getSampleValue(STATUS_METRIC_NAME), is(STATUS_METRIC_VALUE));
+    assertThat(collectorRegistry.getValue().getSampleValue(STATUS_METRIC_NAME),
+        is(STATUS_METRIC_VALUE));
   }
 
   @Test
@@ -72,7 +79,8 @@ public class TestPrometheusReportingTask {
     reportingTask.initialize(initializationContext);
     reportingTask.onTrigger(reportingContext);
 
-    ArgumentCaptor<CollectorRegistry> collectorRegistry = ArgumentCaptor.forClass(CollectorRegistry.class);
+    ArgumentCaptor<CollectorRegistry> collectorRegistry = ArgumentCaptor.forClass(
+        CollectorRegistry.class);
     verify(pushGateway).pushAdd(collectorRegistry.capture(), anyString(), anyMap());
     assertThat(collectorRegistry.getValue().getSampleValue(JVM_METRIC_NAME), is(JVM_METRIC_VALUE));
   }
@@ -156,6 +164,7 @@ public class TestPrometheusReportingTask {
   }
 
   private class TestablePrometheusRepoprtingTask extends PrometheusReportingTask {
+
     @Override
     protected MetricsService newPushGateway() {
       return metricService;

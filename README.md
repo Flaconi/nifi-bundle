@@ -1,20 +1,23 @@
 # Custom NiFi Processors
 
-This repository contains custom Apache Nifi processors. 
+This repository contains custom Apache Nifi processors.
 
 ## Versioning
 
 For convenience, we will tag releases according to version of the dependencies with Apache NiFi.
-For example, if `org.apache.nifi:1.28.1` is used, the bundle should also be released with 
+For example, if `org.apache.nifi:1.28.1` is used, the bundle should also be released with
 the same version (`1.28.1`).
 
 ## Processors
 
 ### ConvertJSONToSQL
 
-It is a modified version of the original processor (v1.7.1). ([original source on github](https://github.com/apache/nifi/blob/rel/nifi-1.7.1/nifi-nar-bundles/nifi-standard-bundle/nifi-standard-processors/src/main/java/org/apache/nifi/processors/standard/ConvertJSONToSQL.java))
-* Converted the date objects formatted with _EEE MMM dd HH:mm:ss zzz yyyy_ to _yyyy-MM-dd HH:mm:ss.SSS_ to 
-prevent any string to date conversion failure.
+It is a modified version of the original processor (
+v1.7.1). ([original source on github](https://github.com/apache/nifi/blob/rel/nifi-1.7.1/nifi-nar-bundles/nifi-standard-bundle/nifi-standard-processors/src/main/java/org/apache/nifi/processors/standard/ConvertJSONToSQL.java))
+
+* Converted the date objects formatted with _EEE MMM dd HH:mm:ss zzz yyyy_ to _yyyy-MM-dd HH:mm:
+  ss.SSS_ to
+  prevent any string to date conversion failure.
 * Added new tags.
 * Added properties to control the catalog and schema name prepending to the table name.
 * Enabled expression language support for _statement type_ property.
@@ -30,7 +33,8 @@ It pushes a gauge type metric to Prometheus Push Gateway.
 
 ### PrometheusReportingTask
 
-A custom reporting task that exports NiFi metrics to Prometheus Push Gateway. This allows monitoring of NiFi instance performance and operational metrics through Prometheus and Grafana dashboards.
+A custom reporting task that exports NiFi metrics to Prometheus Push Gateway. This allows monitoring
+of NiFi instance performance and operational metrics through Prometheus and Grafana dashboards.
 
 ## Build
 
@@ -78,6 +82,7 @@ $ docker run --rm --network host --volume .:/work --volume ~/.m2:/root/.m2 --wor
 ### Test Coverage
 
 After running tests, you can view the coverage reports at:
+
 - `nifi-flaconi-processors/target/site/jacoco/index.html`
 - `nifi-flaconi-reporting-tasks/target/site/jacoco/index.html`
 

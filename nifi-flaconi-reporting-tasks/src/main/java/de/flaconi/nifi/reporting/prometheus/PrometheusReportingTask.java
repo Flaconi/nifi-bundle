@@ -51,7 +51,8 @@ public class PrometheusReportingTask extends AbstractReportingTask {
 
   static final PropertyDescriptor INSTANCE = new PropertyDescriptor.Builder()
       .name("Instance name")
-      .description("The hostname of this NiFi instance to be included in the metrics sent to Prometheus")
+      .description(
+          "The hostname of this NiFi instance to be included in the metrics sent to Prometheus")
       .defaultValue("${hostname(true)}")
       .required(true)
       .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
@@ -86,8 +87,9 @@ public class PrometheusReportingTask extends AbstractReportingTask {
 
   static final PropertyDescriptor PROCESS_GROUP_ID = new PropertyDescriptor.Builder()
       .name("Process Group ID")
-      .description("If specified, the reporting task will send metrics about this process group only. If"
-          + " not, the root process group is used and global metrics are sent.")
+      .description(
+          "If specified, the reporting task will send metrics about this process group only. If"
+              + " not, the root process group is used and global metrics are sent.")
       .required(false)
       .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
       .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
@@ -95,7 +97,8 @@ public class PrometheusReportingTask extends AbstractReportingTask {
 
   @Override
   protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-    final List<PropertyDescriptor> properties = new ArrayList<>(super.getSupportedPropertyDescriptors());
+    final List<PropertyDescriptor> properties = new ArrayList<>(
+        super.getSupportedPropertyDescriptors());
     properties.add(PUSHGATEWAY_HOSTNAME);
     properties.add(PUSHGATEWAY_PORT);
     properties.add(INSTANCE);
@@ -110,14 +113,17 @@ public class PrometheusReportingTask extends AbstractReportingTask {
   protected Collection<ValidationResult> customValidate(ValidationContext validationContext) {
     final List<ValidationResult> results = new ArrayList<>(super.customValidate(validationContext));
 
-    final boolean includeJvmMetrics = validationContext.getProperty(INCLUDE_JVM_METRICS).asBoolean();
-    final boolean includeStatusMetrics = validationContext.getProperty(INCLUDE_STATUS_METRICS).asBoolean();
+    final boolean includeJvmMetrics = validationContext.getProperty(INCLUDE_JVM_METRICS)
+        .asBoolean();
+    final boolean includeStatusMetrics = validationContext.getProperty(INCLUDE_STATUS_METRICS)
+        .asBoolean();
 
     if (!includeJvmMetrics && !includeStatusMetrics) {
       results.add(new ValidationResult.Builder()
           .input("Metric report")
           .valid(false)
-          .explanation("No reporting enabled. Please enable at least one of jvm and processor group.")
+          .explanation(
+              "No reporting enabled. Please enable at least one of jvm and processor group.")
           .build());
     }
 
@@ -126,42 +132,47 @@ public class PrometheusReportingTask extends AbstractReportingTask {
 
   @Override
   public void onTrigger(ReportingContext context) {
-      final String host = context.getProperty(PUSHGATEWAY_HOSTNAME).evaluateAttributeExpressions().getValue();
-      final String port = context.getProperty(PUSHGATEWAY_PORT).getValue();
-      final String instance = context.getProperty(INSTANCE).evaluateAttributeExpressions().getValue();
-      final String jobName = context.getProperty(JOB_NAME).getValue();
-      final boolean includeJvmMetrics = context.getProperty(INCLUDE_JVM_METRICS).asBoolean();
-      final boolean includeStatusMetrics = context.getProperty(INCLUDE_STATUS_METRICS).asBoolean();
+    final String host = context.getProperty(PUSHGATEWAY_HOSTNAME).evaluateAttributeExpressions()
+        .getValue();
+    final String port = context.getProperty(PUSHGATEWAY_PORT).getValue();
+    final String instance = context.getProperty(INSTANCE).evaluateAttributeExpressions().getValue();
+    final String jobName = context.getProperty(JOB_NAME).getValue();
+    final boolean includeJvmMetrics = context.getProperty(INCLUDE_JVM_METRICS).asBoolean();
+    final boolean includeStatusMetrics = context.getProperty(INCLUDE_STATUS_METRICS).asBoolean();
 
-      final MetricsService metricsService = newPushGateway();
-      final Map<String, String> groupingKey = Collections.singletonMap("instance", instance);
-      final PushGateway pushGateway = newPushGateway(host, port);
-      final CollectorRegistry registry = new CollectorRegistry();
+    final MetricsService metricsService = newPushGateway();
+    final Map<String, String> groupingKey = Collections.singletonMap("instance", instance);
+    final PushGateway pushGateway = newPushGateway(host, port);
+    final CollectorRegistry registry = new CollectorRegistry();
 
-      Map<String, String> metrics = new HashMap<>();
+    Map<String, String> metrics = new HashMap<>();
 
-      if (includeJvmMetrics) {
-        metrics.putAll(metricsService.getMetrics(JmxJvmMetrics.getInstance()));
-      }
+    if (includeJvmMetrics) {
+      metrics.putAll(metricsService.getMetrics(JmxJvmMetrics.getInstance()));
+    }
 
-      if (includeStatusMetrics) {
-        final boolean processGroupIdSet = context.getProperty(PROCESS_GROUP_ID).isSet();
-        final String processGroupId = processGroupIdSet ? context.getProperty(PROCESS_GROUP_ID).evaluateAttributeExpressions().getValue() : null;
-        final ProcessGroupStatus status = processGroupId == null ? context.getEventAccess().getControllerStatus() : context.getEventAccess().getGroupStatus(processGroupId);
-        metrics.putAll(metricsService.getMetrics(status, processGroupIdSet));
-      }
+    if (includeStatusMetrics) {
+      final boolean processGroupIdSet = context.getProperty(PROCESS_GROUP_ID).isSet();
+      final String processGroupId =
+          processGroupIdSet ? context.getProperty(PROCESS_GROUP_ID).evaluateAttributeExpressions()
+              .getValue() : null;
+      final ProcessGroupStatus status =
+          processGroupId == null ? context.getEventAccess().getControllerStatus()
+              : context.getEventAccess().getGroupStatus(processGroupId);
+      metrics.putAll(metricsService.getMetrics(status, processGroupIdSet));
+    }
 
-      try {
-        metrics.forEach((key, value)->
+    try {
+      metrics.forEach((key, value) ->
           Gauge.build()
               .name(Collector.sanitizeMetricName(key))
               .help(key)
               .register(registry).set(Double.valueOf(value))
-        );
-        pushGateway.pushAdd(registry, jobName, groupingKey);
-      } catch (IOException ioException) {
-        getLogger().error("Failed to push metrics into pushgateway", ioException);
-      }
+      );
+      pushGateway.pushAdd(registry, jobName, groupingKey);
+    } catch (IOException ioException) {
+      getLogger().error("Failed to push metrics into pushgateway", ioException);
+    }
   }
 
   protected PushGateway newPushGateway(String host, String port) {
