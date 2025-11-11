@@ -31,7 +31,7 @@ It pushes a gauge type metric to Prometheus Push Gateway.
 To build bundle locally
 
 ```commandline
-$ docker run --rm -it --network host --volume .:/work --workdir /work --entrypoint=/bin/bash maven:3-amazoncorretto-8-debian
+$ docker run --rm -it --network host --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-openjdk-8
 ```
 
 Install git
@@ -48,17 +48,19 @@ $ mvn package
 ```
 
 ## Build non-interacive
+
 Build libraries using local maven cache
 ```commandline
-$ docker run --rm --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-amazoncorretto-8-debian -c "apt update && apt install git -y && git config --global --add safe.directory /work && mvn package"
+$ docker run --rm --network host --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-openjdk-8 -c "apt update && apt install git -y && git config --global --add safe.directory /work && mvn package"
 ```
 
 Run tests using local maven cache
 ```commandline
-$ docker run --rm --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-amazoncorretto-8-debian -c "apt update && apt install git -y && git config --global --add safe.directory /work && mvn test"
+$ docker run --rm --network host --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-openjdk-8 -c "apt update && apt install git -y && git config --global --add safe.directory /work && mvn test"
 ```
 
 ## Deployment
+
 Docker compose file used in the production:
 ```yaml
 version: "3"
