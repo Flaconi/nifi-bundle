@@ -1,20 +1,19 @@
 package de.flaconi.nifi.processors;
 
+import static de.flaconi.nifi.processors.PushGaugeMetric.LABEL_SEPARATOR;
+
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.Gauge;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.regex.Pattern;
-
-import static de.flaconi.nifi.processors.PushGaugeMetric.LABEL_SEPARATOR;
 
 public abstract class PushMetricProcessor extends AbstractProcessor {
 

@@ -4,6 +4,13 @@ import io.prometheus.client.Collector;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.exporter.PushGateway;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.nifi.annotation.configuration.DefaultSchedule;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
@@ -18,9 +25,6 @@ import org.apache.nifi.reporting.AbstractReportingTask;
 import org.apache.nifi.reporting.ReportingContext;
 import org.apache.nifi.reporting.util.metrics.MetricsService;
 import org.apache.nifi.scheduling.SchedulingStrategy;
-
-import java.io.IOException;
-import java.util.*;
 
 @Tags({"reporting", "prometheus", "metrics"})
 @CapabilityDescription("Publishes metrics from NiFi to Prometheus Push Gateway")

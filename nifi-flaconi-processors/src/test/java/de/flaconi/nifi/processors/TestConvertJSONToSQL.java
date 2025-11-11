@@ -1,14 +1,13 @@
 package de.flaconi.nifi.processors;
 
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.sql.Types;
-
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.sql.Types;
+import org.junit.Test;
 
 public class TestConvertJSONToSQL {
 

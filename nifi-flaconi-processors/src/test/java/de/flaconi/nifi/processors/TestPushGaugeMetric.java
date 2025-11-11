@@ -1,7 +1,25 @@
 package de.flaconi.nifi.processors;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.anyMap;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.PushGateway;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
@@ -12,21 +30,6 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.mockito.Matchers.anyMapOf;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Mockito.anyMap;
-import static org.mockito.Mockito.*;
 
 @SuppressWarnings("unchecked")
 public class TestPushGaugeMetric {
@@ -258,13 +261,13 @@ public class TestPushGaugeMetric {
   private void givenAPushGateway() throws IOException {
     doNothing()
         .when(pushGateway)
-        .pushAdd(isA(CollectorRegistry.class), anyString(), anyMapOf(String.class, String.class));
+        .pushAdd(any(CollectorRegistry.class), anyString(), anyMap());
   }
 
   private void givenAPushGatewayWithFailure() throws IOException {
     doThrow(IOException.class)
         .when(pushGateway)
-        .pushAdd(isA(CollectorRegistry.class), anyString(), anyMapOf(String.class, String.class));
+        .pushAdd(any(CollectorRegistry.class), anyString(), anyMap());
   }
 
   public static class TestablePushGaugeMetric extends PushGaugeMetric {
