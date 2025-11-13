@@ -78,9 +78,9 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .name("Metric Labels")
       .description("The gauge metric labels, comma-separated labels. If it is set then the dynamic attributes should be added.")
       .required(false)
-      .expressionLanguageSupported(ExpressionLanguageScope.NONE)
+      .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-      .addValidator(StandardValidators.createRegexMatchingValidator(Pattern.compile("[a-zA-Z_:][a-zA-Z0-9_:,]*")))
+      .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .build();
 
   static final PropertyDescriptor GAUGE_LABEL_VALUES_SOURCE = new PropertyDescriptor.Builder()
@@ -150,7 +150,7 @@ public class PushGaugeMetric extends PushMetricProcessor {
     final String jobName = processContext.getProperty(JOB_NAME).getValue();
     final String metricName = processContext.getProperty(GAUGE_NAME).evaluateAttributeExpressions(flowFile).getValue();
     final String metricHelp = processContext.getProperty(GAUGE_HELP).getValue();
-    final String metricLabels = processContext.getProperty(GAUGE_LABELS).getValue();
+    final String metricLabels = processContext.getProperty(GAUGE_LABELS).evaluateAttributeExpressions(flowFile).getValue();
     final String metricLabelValuesSource = processContext.getProperty(GAUGE_LABEL_VALUES_SOURCE).getValue();
     final Map<String, String> groupingKey = Collections.singletonMap("instance", instance);
     final PushGateway pushGateway = newPushGateway(host, port);
