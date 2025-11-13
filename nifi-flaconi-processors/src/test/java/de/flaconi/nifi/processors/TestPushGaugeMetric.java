@@ -1,38 +1,38 @@
 package de.flaconi.nifi.processors;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.anyMap;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.PushGateway;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.nifi.util.TestRunner;
-import org.apache.nifi.util.TestRunners;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.*;
-import static org.mockito.Matchers.anyMapOf;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Matchers.isA;
-import static org.mockito.Mockito.anyMap;
-import static org.mockito.Mockito.*;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.nifi.util.TestRunner;
+import org.apache.nifi.util.TestRunners;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 @SuppressWarnings("unchecked")
 public class TestPushGaugeMetric {
 
-  private TestRunner testRunner;
-  private static PushGateway pushGateway;
   private static final String INSTANCE = "localhost";
   private static final String JOB_NAME = "job_name";
   private static final String GAUGE_NAME = "metric";
@@ -44,9 +44,8 @@ public class TestPushGaugeMetric {
   private static final String[] GAUGE_LABEL_NAMES = new String[]{"method", "appId"};
   private static final String GAUGE_LABEL_NAMES_INVALID = "  ";
   private static final String[][] GAUGE_LABEL_VALUES = new String[][]{{"get", "1"}, {"post", "1"}};
-
-  @Rule
-  public ExpectedException expectedException = ExpectedException.none();
+  private static PushGateway pushGateway;
+  private TestRunner testRunner;
 
   @Before
   public void before() {
@@ -69,7 +68,8 @@ public class TestPushGaugeMetric {
     testRunner.run();
 
     testRunner.assertTransferCount(PushGaugeMetric.REL_SUCCESS, 1);
-    ArgumentCaptor<CollectorRegistry> collectorRegistry = ArgumentCaptor.forClass(CollectorRegistry.class);
+    ArgumentCaptor<CollectorRegistry> collectorRegistry = ArgumentCaptor.forClass(
+        CollectorRegistry.class);
     ArgumentCaptor<Map<String, String>> groupingKey = ArgumentCaptor.forClass((Class) Map.class);
     verify(pushGateway).pushAdd(collectorRegistry.capture(), eq(JOB_NAME), groupingKey.capture());
     assertThat(groupingKey.getValue(), hasEntry("instance", INSTANCE));
@@ -85,13 +85,16 @@ public class TestPushGaugeMetric {
     testRunner.run();
 
     testRunner.assertTransferCount(PushGaugeMetric.REL_SUCCESS, 1);
-    ArgumentCaptor<CollectorRegistry> collectorRegistry = ArgumentCaptor.forClass(CollectorRegistry.class);
+    ArgumentCaptor<CollectorRegistry> collectorRegistry = ArgumentCaptor.forClass(
+        CollectorRegistry.class);
     verify(pushGateway).pushAdd(collectorRegistry.capture(), anyString(), anyMap());
     assertThat(
-        collectorRegistry.getValue().getSampleValue(GAUGE_NAME, GAUGE_LABEL_NAMES, GAUGE_LABEL_VALUES[0]),
+        collectorRegistry.getValue()
+            .getSampleValue(GAUGE_NAME, GAUGE_LABEL_NAMES, GAUGE_LABEL_VALUES[0]),
         is(GAUGE_VALUE));
     assertThat(
-        collectorRegistry.getValue().getSampleValue(GAUGE_NAME, GAUGE_LABEL_NAMES, GAUGE_LABEL_VALUES[1]),
+        collectorRegistry.getValue()
+            .getSampleValue(GAUGE_NAME, GAUGE_LABEL_NAMES, GAUGE_LABEL_VALUES[1]),
         is(GAUGE_VALUE));
   }
 
@@ -127,15 +130,15 @@ public class TestPushGaugeMetric {
     givenAProcessorWithInvalidData();
     givenAFlowFile();
 
-    expectedException.expect(AssertionError.class);
-    expectedException.expectMessage(containsString("Processor has 5 validation failures"));
-    expectedException.expectMessage(containsString("Pushgateway hostname"));
-    expectedException.expectMessage(containsString("Metric Name"));
-    expectedException.expectMessage(containsString("Metric Help"));
-    expectedException.expectMessage(containsString("Metric Value"));
-    //expectedException.expectMessage(containsString("Metric Labels"));
+    AssertionError exception = assertThrows(AssertionError.class, () -> testRunner.run());
 
-    testRunner.run();
+    String message = exception.getMessage();
+    assertThat(message, containsString("Processor has 5 validation failures"));
+    assertThat(message, containsString("Pushgateway hostname"));
+    assertThat(message, containsString("Metric Name"));
+    assertThat(message, containsString("Metric Help"));
+    assertThat(message, containsString("Metric Value"));
+    //assertThat(message, containsString("Metric Labels"));
   }
 
   @Test
@@ -152,11 +155,10 @@ public class TestPushGaugeMetric {
     givenAProcessorWithLabelsSourceFlowContent();
     givenAFlowFile();
 
-    expectedException.expect(AssertionError.class);
-    expectedException.expectMessage(containsString("Flowfile content is empty"));
-
     testRunner.setValidateExpressionUsage(false);
-    testRunner.run();
+
+    AssertionError exception = assertThrows(AssertionError.class, () -> testRunner.run());
+    assertThat(exception.getMessage(), containsString("Flowfile content is empty"));
   }
 
   @Test
@@ -164,11 +166,10 @@ public class TestPushGaugeMetric {
     givenAProcessorWithLabelsSourceFlowContent();
     givenAFlowFileWithInvalidContent();
 
-    expectedException.expect(AssertionError.class);
-    expectedException.expectCause(instanceOf(IllegalArgumentException.class));
-
     testRunner.setValidateExpressionUsage(false);
-    testRunner.run();
+
+    AssertionError exception = assertThrows(AssertionError.class, () -> testRunner.run());
+    assertThat(exception.getCause(), instanceOf(IllegalArgumentException.class));
   }
 
   private void givenAProcessorWithNoValue() {
@@ -194,30 +195,38 @@ public class TestPushGaugeMetric {
 
   private void givenAProcessorWithLabelsAndSuccessConnection() throws IOException {
     givenAProcessorWithNoValue();
-    testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS, StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
-    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE, PushGaugeMetric.SOURCE_ATTRIBUTE);
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS,
+        StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE,
+        PushGaugeMetric.SOURCE_ATTRIBUTE);
     testRunner.setProperty("dynamic1",
         StringUtils.join(
-            Stream.concat(Arrays.stream(GAUGE_LABEL_VALUES[0]), Stream.of(GAUGE_VALUE.toString())).toArray(String[]::new),
+            Stream.concat(Arrays.stream(GAUGE_LABEL_VALUES[0]), Stream.of(GAUGE_VALUE.toString()))
+                .toArray(String[]::new),
             PushGaugeMetric.LABEL_SEPARATOR));
     testRunner.setProperty("dynamic2",
         StringUtils.join(
-            Stream.concat(Arrays.stream(GAUGE_LABEL_VALUES[1]), Stream.of(GAUGE_VALUE.toString())).toArray(String[]::new),
+            Stream.concat(Arrays.stream(GAUGE_LABEL_VALUES[1]), Stream.of(GAUGE_VALUE.toString()))
+                .toArray(String[]::new),
             PushGaugeMetric.LABEL_SEPARATOR));
     givenAPushGateway();
   }
 
   private void givenAProcessorWithLabelsSourceFlowContent() throws IOException {
     givenAProcessorWithNoValue();
-    testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS, StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
-    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE, PushGaugeMetric.SOURCE_CONTENT);
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS,
+        StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE,
+        PushGaugeMetric.SOURCE_CONTENT);
     givenAPushGateway();
   }
 
   private void givenAProcessorWithIncorrectNumberOfLabels() {
     givenAProcessorWithNoValue();
-    testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS, StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
-    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE, PushGaugeMetric.SOURCE_ATTRIBUTE);
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS,
+        StringUtils.join(GAUGE_LABEL_NAMES, PushGaugeMetric.LABEL_SEPARATOR));
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE,
+        PushGaugeMetric.SOURCE_ATTRIBUTE);
     testRunner.setProperty("dynamic1",
         StringUtils.join(GAUGE_LABEL_VALUES[0], PushGaugeMetric.LABEL_SEPARATOR));
   }
@@ -227,7 +236,8 @@ public class TestPushGaugeMetric {
     testRunner.setProperty(PushGaugeMetric.GAUGE_HELP, GAUGE_HELP_INVALID);
     testRunner.setProperty(PushGaugeMetric.GAUGE_VALUE, GAUGE_VALUE_INVALID);
     testRunner.setProperty(PushGaugeMetric.GAUGE_LABELS, GAUGE_LABEL_NAMES_INVALID);
-    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE, PushGaugeMetric.SOURCE_ATTRIBUTE);
+    testRunner.setProperty(PushGaugeMetric.GAUGE_LABEL_VALUES_SOURCE,
+        PushGaugeMetric.SOURCE_ATTRIBUTE);
   }
 
   private void givenAFlowFile() {
@@ -258,16 +268,17 @@ public class TestPushGaugeMetric {
   private void givenAPushGateway() throws IOException {
     doNothing()
         .when(pushGateway)
-        .pushAdd(isA(CollectorRegistry.class), anyString(), anyMapOf(String.class, String.class));
+        .pushAdd(any(CollectorRegistry.class), anyString(), anyMap());
   }
 
   private void givenAPushGatewayWithFailure() throws IOException {
     doThrow(IOException.class)
         .when(pushGateway)
-        .pushAdd(isA(CollectorRegistry.class), anyString(), anyMapOf(String.class, String.class));
+        .pushAdd(any(CollectorRegistry.class), anyString(), anyMap());
   }
 
   public static class TestablePushGaugeMetric extends PushGaugeMetric {
+
     @Override
     public PushGateway newPushGateway(String host, String port) {
       return pushGateway;

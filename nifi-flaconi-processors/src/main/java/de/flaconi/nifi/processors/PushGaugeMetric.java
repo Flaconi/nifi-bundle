@@ -3,6 +3,17 @@ package de.flaconi.nifi.processors;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.exporter.PushGateway;
+import java.io.IOException;
+import java.io.StringReader;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.annotation.behavior.DynamicProperty;
@@ -25,29 +36,23 @@ import org.apache.nifi.processor.util.StandardValidators;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.StringReader;
-import java.nio.charset.Charset;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Pattern;
-
 @InputRequirement(InputRequirement.Requirement.INPUT_ALLOWED)
 @Tags({"Prometheus", "Pushgateway", "Push", "Gauge"})
-@CapabilityDescription("Pushes a gauge type metric to the Prometheus Pushgateway. If 'Metric Labels' is NOT given "
-    + "then 'Metric Value' is taken as metric value otherwise any dynamic attribute defined is used to build the metric value.")
+@CapabilityDescription(
+    "Pushes a gauge type metric to the Prometheus Pushgateway. If 'Metric Labels' is NOT given "
+        + "then 'Metric Value' is taken as metric value otherwise any dynamic attribute defined is used to build the metric value.")
 @DynamicProperty(name = "Key identifier like sequential numbers",
-    value = "Comma separated labels with metric value at the end. e.g. 'get,${application_id},${http_request_total_get}' " +
-        "or {$http_method},${http_request_total}'",
+    value =
+        "Comma separated labels with metric value at the end. e.g. 'get,${application_id},${http_request_total_get}' "
+            +
+            "or {$http_method},${http_request_total}'",
     description = "Specifies labels and value to be sent to the Prometheus Pushgateway",
     supportsExpressionLanguage = true)
 public class PushGaugeMetric extends PushMetricProcessor {
 
-  private static final Logger logger = LoggerFactory.getLogger(PushGaugeMetric.class);
   static final String SOURCE_ATTRIBUTE = "flowfile-attribute";
   static final String SOURCE_CONTENT = "flowfile-content";
   static final String LABEL_SEPARATOR = ",";
-
   static final PropertyDescriptor GAUGE_NAME = new PropertyDescriptor.Builder()
       .name("Metric Name")
       .description("The gauge metric name")
@@ -56,7 +61,6 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .build();
-
   static final PropertyDescriptor GAUGE_HELP = new PropertyDescriptor.Builder()
       .name("Metric Help")
       .description("The gauge metric help")
@@ -64,7 +68,6 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .expressionLanguageSupported(ExpressionLanguageScope.NONE)
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .build();
-
   static final PropertyDescriptor GAUGE_VALUE = new PropertyDescriptor.Builder()
       .name("Metric Value")
       .description("The gauge metric value")
@@ -73,23 +76,25 @@ public class PushGaugeMetric extends PushMetricProcessor {
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .build();
-
   static final PropertyDescriptor GAUGE_LABELS = new PropertyDescriptor.Builder()
       .name("Metric Labels")
-      .description("The gauge metric labels, comma-separated labels. If it is set then the dynamic attributes should be added.")
+      .description(
+          "The gauge metric labels, comma-separated labels. If it is set then the dynamic attributes should be added.")
       .required(false)
       .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
       .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
       .addValidator(StandardValidators.ATTRIBUTE_EXPRESSION_LANGUAGE_VALIDATOR)
       .build();
-
   static final PropertyDescriptor GAUGE_LABEL_VALUES_SOURCE = new PropertyDescriptor.Builder()
       .name("Source of metric label values")
-      .description("Indicates whether the metric label values are taken from the FlowFile content or a FlowFile dynamic attribute; " +
-          "if The gauge metric labels is defined then the source is required.")
+      .description(
+          "Indicates whether the metric label values are taken from the FlowFile content or a FlowFile dynamic attribute; "
+              +
+              "if The gauge metric labels is defined then the source is required.")
       .required(false)
       .allowableValues(SOURCE_ATTRIBUTE, SOURCE_CONTENT)
       .build();
+  private static final Logger logger = LoggerFactory.getLogger(PushGaugeMetric.class);
 
   @Override
   protected void init(ProcessorInitializationContext context) {
@@ -119,15 +124,18 @@ public class PushGaugeMetric extends PushMetricProcessor {
   }
 
   @Override
-  protected PropertyDescriptor getSupportedDynamicPropertyDescriptor(String propertyDescriptorName) {
+  protected PropertyDescriptor getSupportedDynamicPropertyDescriptor(
+      String propertyDescriptorName) {
     return new PropertyDescriptor.Builder()
         .name(propertyDescriptorName)
-        .description("Key is an identifier like sequential numbers, value is comma separated labels " +
-            "with metric value at the end. e.g. 'get,${application_id},${http_request_total_get}")
+        .description(
+            "Key is an identifier like sequential numbers, value is comma separated labels " +
+                "with metric value at the end. e.g. 'get,${application_id},${http_request_total_get}")
         .required(true)
         .dynamic(true)
         .expressionLanguageSupported(ExpressionLanguageScope.FLOWFILE_ATTRIBUTES)
-        .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING, true))
+        .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(
+            AttributeExpression.ResultType.STRING, true))
         .addValidator(Validator.VALID)
         .build();
   }
@@ -138,20 +146,26 @@ public class PushGaugeMetric extends PushMetricProcessor {
   }
 
   @Override
-  public void onTrigger(ProcessContext processContext, ProcessSession processSession) throws ProcessException {
+  public void onTrigger(ProcessContext processContext, ProcessSession processSession)
+      throws ProcessException {
     final FlowFile flowFile = processSession.get();
     if (flowFile == null) {
       return;
     }
 
-    final String host = processContext.getProperty(PUSHGATEWAY_HOSTNAME).evaluateAttributeExpressions(flowFile).getValue();
+    final String host = processContext.getProperty(PUSHGATEWAY_HOSTNAME)
+        .evaluateAttributeExpressions(flowFile).getValue();
     final String port = processContext.getProperty(PUSHGATEWAY_PORT).getValue();
-    final String instance = processContext.getProperty(INSTANCE).evaluateAttributeExpressions(flowFile).getValue();
+    final String instance = processContext.getProperty(INSTANCE)
+        .evaluateAttributeExpressions(flowFile).getValue();
     final String jobName = processContext.getProperty(JOB_NAME).getValue();
-    final String metricName = processContext.getProperty(GAUGE_NAME).evaluateAttributeExpressions(flowFile).getValue();
+    final String metricName = processContext.getProperty(GAUGE_NAME)
+        .evaluateAttributeExpressions(flowFile).getValue();
     final String metricHelp = processContext.getProperty(GAUGE_HELP).getValue();
-    final String metricLabels = processContext.getProperty(GAUGE_LABELS).evaluateAttributeExpressions(flowFile).getValue();
-    final String metricLabelValuesSource = processContext.getProperty(GAUGE_LABEL_VALUES_SOURCE).getValue();
+    final String metricLabels = processContext.getProperty(GAUGE_LABELS)
+        .evaluateAttributeExpressions(flowFile).getValue();
+    final String metricLabelValuesSource = processContext.getProperty(GAUGE_LABEL_VALUES_SOURCE)
+        .getValue();
     final Map<String, String> groupingKey = Collections.singletonMap("instance", instance);
     final PushGateway pushGateway = newPushGateway(host, port);
     final CollectorRegistry registry = new CollectorRegistry();
@@ -160,10 +174,12 @@ public class PushGaugeMetric extends PushMetricProcessor {
       checkMetricName(metricName);
       if (StringUtils.isEmpty(metricLabels)) {
         final Gauge gauge = registerGaugeMetric(registry, metricName, metricHelp);
-        gauge.set(processContext.getProperty(GAUGE_VALUE).evaluateAttributeExpressions(flowFile).asDouble());
+        gauge.set(processContext.getProperty(GAUGE_VALUE).evaluateAttributeExpressions(flowFile)
+            .asDouble());
       } else {
         String[] labelNames = metricLabels.split(LABEL_SEPARATOR);
-        final Gauge gauge = registerGaugeMetric(registry, metricName, metricHelp, metricLabels.split(LABEL_SEPARATOR));
+        final Gauge gauge = registerGaugeMetric(registry, metricName, metricHelp,
+            metricLabels.split(LABEL_SEPARATOR));
         if (metricLabelValuesSource.equals(SOURCE_ATTRIBUTE)) {
           setMetricWithLabelsFromAttributes(gauge, processContext, flowFile, labelNames.length);
         } else {
@@ -174,7 +190,8 @@ public class PushGaugeMetric extends PushMetricProcessor {
       pushGateway.pushAdd(registry, jobName, groupingKey);
       processSession.transfer(flowFile, REL_SUCCESS);
     } catch (IOException ioException) {
-      logger.error(String.format("Failed to push the metric \"%s\" into pushgateway due to \"%s\"", metricName, ioException),
+      logger.error(String.format("Failed to push the metric \"%s\" into pushgateway due to \"%s\"",
+              metricName, ioException),
           ioException);
       processSession.transfer(flowFile, REL_FAILURE);
       processContext.yield();
@@ -194,9 +211,12 @@ public class PushGaugeMetric extends PushMetricProcessor {
       }
 
       String labels = validationContext.getProperty(GAUGE_LABELS).getValue();
-      String labelValuesSource = validationContext.getProperty(GAUGE_LABEL_VALUES_SOURCE).getValue();
-      if (labelValuesSource != null && labelValuesSource.equals(SOURCE_ATTRIBUTE) && !StringUtils.isEmpty(labels)) {
-        if (validationContext.getProperties().keySet().stream().noneMatch(PropertyDescriptor::isDynamic)) {
+      String labelValuesSource = validationContext.getProperty(GAUGE_LABEL_VALUES_SOURCE)
+          .getValue();
+      if (labelValuesSource != null && labelValuesSource.equals(SOURCE_ATTRIBUTE)
+          && !StringUtils.isEmpty(labels)) {
+        if (validationContext.getProperties().keySet().stream()
+            .noneMatch(PropertyDescriptor::isDynamic)) {
           reasons.add(new ValidationResult.Builder()
               .subject("Dynamic property value")
               .valid(false)
@@ -216,7 +236,8 @@ public class PushGaugeMetric extends PushMetricProcessor {
               .subject("Dynamic property value")
               .valid(false)
               .explanation("the dynamic property values should contain " + (labelCount + 1)
-                  + " items (including metric label value at the end) since there is/are " + labelCount + " label(s) defined.").build());
+                  + " items (including metric label value at the end) since there is/are "
+                  + labelCount + " label(s) defined.").build());
         }
       }
     }
@@ -224,15 +245,18 @@ public class PushGaugeMetric extends PushMetricProcessor {
     return reasons;
   }
 
-  private void setMetricWithLabelsFromAttributes(Gauge gauge, ProcessContext processContext, FlowFile flowFile, int labelNamesCount) throws NumberFormatException {
+  private void setMetricWithLabelsFromAttributes(Gauge gauge, ProcessContext processContext,
+      FlowFile flowFile, int labelNamesCount) throws NumberFormatException {
     processContext.getProperties().keySet().stream().filter(PropertyDescriptor::isDynamic)
         .forEach(propertyDescriptor -> {
-          String value = processContext.getProperty(propertyDescriptor).evaluateAttributeExpressions(flowFile).getValue();
+          String value = processContext.getProperty(propertyDescriptor)
+              .evaluateAttributeExpressions(flowFile).getValue();
           setLabelValuesToGaugeMetric(gauge, value, labelNamesCount + 1);
         });
   }
 
-  private void setMetricWithLabelsFromContent(Gauge gauge, ProcessSession processSession, FlowFile flowFile, int labelNamesCount) throws NumberFormatException, IOException {
+  private void setMetricWithLabelsFromContent(Gauge gauge, ProcessSession processSession,
+      FlowFile flowFile, int labelNamesCount) throws NumberFormatException, IOException {
     String content = getFlowContent(processSession, flowFile);
     if (StringUtils.isEmpty(content)) {
       throw new IllegalArgumentException("Flowfile content is empty.");
@@ -244,7 +268,8 @@ public class PushGaugeMetric extends PushMetricProcessor {
 
   private String getFlowContent(ProcessSession processSession, FlowFile flowFile) {
     final AtomicReference<String> content = new AtomicReference<>();
-    processSession.read(flowFile, in -> content.set(IOUtils.toString(in, Charset.forName("UTF-8"))));
+    processSession.read(flowFile,
+        in -> content.set(IOUtils.toString(in, Charset.forName("UTF-8"))));
     return content.get();
   }
 

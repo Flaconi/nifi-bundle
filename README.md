@@ -1,20 +1,23 @@
 # Custom NiFi Processors
 
-This repository contains custom Apache Nifi processors. 
+This repository contains custom Apache Nifi processors.
 
 ## Versioning
 
 For convenience, we will tag releases according to version of the dependencies with Apache NiFi.
-For example, if `org.apache.nifi:1.15.2` is used, the bundle should also be released with 
-the same version (`1.15.2`).
+For example, if `org.apache.nifi:1.28.1` is used, the bundle should also be released with
+the same version (`1.28.1`).
 
 ## Processors
 
 ### ConvertJSONToSQL
 
-It is a modified version of the original processor (v1.7.1). ([original source on github](https://github.com/apache/nifi/blob/rel/nifi-1.7.1/nifi-nar-bundles/nifi-standard-bundle/nifi-standard-processors/src/main/java/org/apache/nifi/processors/standard/ConvertJSONToSQL.java))
-* Converted the date objects formatted with _EEE MMM dd HH:mm:ss zzz yyyy_ to _yyyy-MM-dd HH:mm:ss.SSS_ to 
-prevent any string to date conversion failure.
+It is a modified version of the original processor (
+v1.7.1). ([original source on github](https://github.com/apache/nifi/blob/rel/nifi-1.7.1/nifi-nar-bundles/nifi-standard-bundle/nifi-standard-processors/src/main/java/org/apache/nifi/processors/standard/ConvertJSONToSQL.java))
+
+* Converted the date objects formatted with _EEE MMM dd HH:mm:ss zzz yyyy_ to _yyyy-MM-dd HH:mm:
+  ss.SSS_ to
+  prevent any string to date conversion failure.
 * Added new tags.
 * Added properties to control the catalog and schema name prepending to the table name.
 * Enabled expression language support for _statement type_ property.
@@ -26,41 +29,64 @@ prevent any string to date conversion failure.
 
 It pushes a gauge type metric to Prometheus Push Gateway.
 
+## Reporting Tasks
+
+### PrometheusReportingTask
+
+A custom reporting task that exports NiFi metrics to Prometheus Push Gateway. This allows monitoring
+of NiFi instance performance and operational metrics through Prometheus and Grafana dashboards.
+
 ## Build
 
-To build bundle locally
+### Prerequisites
+
+- Java 8 (required for NiFi 1.28.1 compatibility)
+- Maven 3.x
+
+### Local Build (with Java 8 installed)
+
+Build the project:
 
 ```commandline
-$ docker run --rm -it --network host --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-openjdk-8
+$ mvn clean package
 ```
 
-Install git
+Run tests:
 
 ```commandline
-$ apt update && apt install git -y
-$ git config --global --add safe.directory /work
+$ mvn test
 ```
 
-Build libraries
+Run tests with coverage report:
 
 ```commandline
-$ mvn package
+$ mvn clean test jacoco:report
 ```
 
-## Build non-interacive
+### Docker Build (alternative)
 
-Build libraries using local maven cache
+If you don't have Java 8 locally, you can use Docker to build with the correct Java version.
+
+Build libraries using Docker with local maven cache:
+
 ```commandline
-$ docker run --rm --network host --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-openjdk-8 -c "apt update && apt install git -y && git config --global --add safe.directory /work && mvn package"
+$ docker run --rm --network host --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-openjdk-8 -c "mvn clean package"
 ```
 
-Run tests using local maven cache
+Run tests using Docker with local maven cache:
+
 ```commandline
-$ docker run --rm --network host --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-openjdk-8 -c "apt update && apt install git -y && git config --global --add safe.directory /work && mvn test"
+$ docker run --rm --network host --volume .:/work --volume ~/.m2:/root/.m2 --workdir /work --entrypoint=/bin/bash maven:3-openjdk-8 -c "mvn test"
 ```
+
+### Test Coverage
+
+After running tests, you can view the coverage reports at:
+
+- `nifi-flaconi-processors/target/site/jacoco/index.html`
+- `nifi-flaconi-reporting-tasks/target/site/jacoco/index.html`
 
 ## Deployment
-
 Docker compose file used in the production:
 ```yaml
 version: "3"
@@ -109,7 +135,7 @@ services:
     nifi:
         hostname: nifi
         container_name: nifi_container_persistent
-        image: 'apache/nifi:1.15.2'  # latest image as of 2022-01-03.
+        image: 'apache/nifi:1.28.1'  # latest image as of 2024-11-20.
         logging:
             driver: "json-file"
             options:
@@ -151,7 +177,7 @@ services:
             # WMS/lfs
             - "./dependencies/jdbc-driver/db2/jt400.jar:/opt/nifi/nifi-current/lib/jt400.jar"
             # self developed nifi processors
-            - "./dependencies/nifi_flaconi_lib/nifi-flaconi-nar-1.15.2.nar:/opt/nifi/nifi-current/lib/nifi-flaconi-nar-1.15.2.nar"
+            - "./dependencies/nifi_flaconi_lib/nifi-flaconi-nar-1.28.1.nar:/opt/nifi/nifi-current/lib/nifi-flaconi-nar-1.28.1.nar"
             # key files
             - "./nifi/dependencies/key_files/nifi-drive-bundle-serviceaccount.p12:/opt/key_files/nifi-drive-bundle-serviceaccount.p12"
             # json transformer xml xslt
